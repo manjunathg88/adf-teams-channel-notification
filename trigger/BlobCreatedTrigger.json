@@ -1,0 +1,30 @@
+{
+    "type": "BlobEventsTrigger",
+    "name": "BlobCreatedTrigger",
+    "properties": {
+        "annotations": [],
+        "runtimeState": "Started",
+        "pipelines": [
+            {
+                "pipelineReference": {
+                    "referenceName": "Read CSV file and post to channel in MS Teams",
+                    "type": "PipelineReference"
+                },
+                "parameters": {
+                    "teamsWebhookUrl": "{MicrosoftTeamsWebhookUrl}",
+                    "triggerFolderPath": "@triggerBody().folderPath",
+                    "triggerFilename": "@triggerBody().fileName"
+                }
+            }
+        ],
+        "typeProperties": {
+            "blobPathBeginsWith": "{FilePathSuffix}",
+            "blobPathEndsWith": ".csv",
+            "ignoreEmptyBlobs": false,
+            "scope": "/subscriptions/{SubscriptionsId}/resourceGroups/{ResourceGroupName}/providers/Microsoft.Storage/storageAccounts/{StorageAccountName}",
+            "events": [
+                "Microsoft.Storage.BlobCreated"
+            ]
+        }
+    }
+}

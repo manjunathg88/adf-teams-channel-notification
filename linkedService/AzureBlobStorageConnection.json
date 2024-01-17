@@ -1,0 +1,16 @@
+{
+    "type": "Microsoft.DataFactory/factories/linkedservices",
+    "name": "AzureBlobStorageConnection",
+    "properties": {
+        "annotations": [],
+        "type": "AzureBlobStorage",
+        "typeProperties": {
+            "serviceEndpoint": "{StorageAccountBlobServiceEndpoint}",
+            "accountKind": "StorageV2"
+        },
+        "connectVia": {
+            "referenceName": "AutoResolveIntegrationRuntime",
+            "type": "IntegrationRuntimeReference"
+        }
+    }
+}

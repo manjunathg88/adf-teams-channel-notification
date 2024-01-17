@@ -1,0 +1,249 @@
+{
+    "type": "Microsoft.DataFactory/factories/pipelines"
+    "name": "Read CSV file and post to channel in MS Teams",
+    "properties": {
+        "description": "This ADF Pipeline will be triggered when an CSV file is dropped in a specific location in the Storage Account Container. Pipeline reads the CSV files, creates an HTML table and posts this table as a notification to the Microsoft Teams Channel",
+        "activities": [
+            {
+                "name": "Create Message Card for Teams Channel",
+                "description": "",
+                "type": "SetVariable",
+                "dependsOn": [
+                    {
+                        "activity": "Create HTML Table",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "messageCardString",
+                    "value": {
+                        "value": "{\n    \"@type\": \"MessageCard\",\n    \"@context\": \"
+http://schema.org/extensions\",\n
+    \"themeColor\": \"0076D7\",\n    \"summary\": \"Pipeline status alert message\",\n    \"sections\": [\n        {\n            \"activityTitle\": \"Pipeline alert\",\n            \"facts\": [\n                {\n                    \"name\": \"Pipeline RunId:\",\n                    \"value\": \"@{pipeline().RunId}\"\n                },\n                {\n                    \"name\": \"Notification time (UTC):\",\n                    \"value\": \"@{utcNow()}\"\n                },\n                {\n                    \"name\": \"Data Factory name:\",\n                    \"value\": \"@{pipeline().DataFactory}\"\n                }\n            ],\n            \"markdown\": true\n        },\n\t\t{\n\t\t  \"startGroup\": true,\n\t\t  \"text\": \"@{variables('htmlTable')}\"\n    ],\t\n    \"potentialAction\": [\n        {\n            \"@type\": \"OpenUri\",\n            \"name\": \"View pipeline run\",\n            \"targets\": [\n                {\n                    \"os\": \"default\",\n                    \"uri\": \"@{concat('
+https://adf.azure.com/monitoring/pipelineruns/',pipeline().RunId,'?factory=/subscriptions/',pipeline().parameters.dataFactorySubscription,'/resourceGroups/',pipeline().parameters.dataFactoryResourceGroup,'/providers/Microsoft.DataFactory/factories/',pipeline().DataFactory)}\"\n
+                }\n            ]\n        }\n    ]\n}",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "Call MS Teams Webhook",
+                "description": "Invokes teams channel's webbook.",
+                "type": "WebActivity",
+                "dependsOn": [
+                    {
+                        "activity": "Create Message Card for Teams Channel",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "7.00:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "url": {
+                        "value": "@pipeline().parameters.teamsWebhookUrl",
+                        "type": "Expression"
+                    },
+                    "connectVia": {
+                        "referenceName": "AutoResolveIntegrationRuntime",
+                        "type": "IntegrationRuntimeReference"
+                    },
+                    "method": "POST",
+                    "body": {
+                        "value": "@json(variables('messageCardString'))",
+                        "type": "Expression"
+                    },
+					"authentication": {
+                        "type": "{AuthenticationType}",
+                        "username": "{UserName}",
+                        "password": {
+                            "type": "SecureString",
+                            "value": "{Password}"
+                        }
+                    }
+                }
+            },
+            {
+                "name": "Read CSV file",
+                "type": "Lookup",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "DelimitedTextSource",
+                        "storeSettings": {
+                            "type": "AzureBlobStorageReadSettings",
+                            "recursive": true,
+                            "wildcardFolderPath": {
+                                "value": "@pipeline().parameters.triggerFolderPath",
+                                "type": "Expression"
+                            },
+                            "wildcardFileName": {
+                                "value": "@pipeline().parameters.triggerFilename",
+                                "type": "Expression"
+                            },
+                            "enablePartitionDiscovery": false
+                        },
+                        "formatSettings": {
+                            "type": "DelimitedTextReadSettings"
+                        }
+                    },
+                    "dataset": {
+                        "referenceName": "BlobFileCSV",
+                        "type": "DatasetReference"
+                    },
+                    "firstRowOnly": false
+                }
+            },
+            {
+                "name": "Update Html Data Rows",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Read CSV file",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Read CSV file').output.value",
+                        "type": "Expression"
+                    },
+                    "isSequential": true,
+                    "activities": [
+                        {
+                            "name": "Create HTML Row",
+                            "type": "SetVariable",
+                            "dependsOn": [],
+                            "policy": {
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "variableName": "dataRow",
+                                "value": {
+                                    "value": "@concat(variables('dataRows'), '<tr><td>', item().Name, '</td><td>',item().Gender, '</td><td>', item().Age,' </td></tr>')",
+                                    "type": "Expression"
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update HTML Table",
+                            "type": "SetVariable",
+                            "dependsOn": [
+                                {
+                                    "activity": "Create HTML Row",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "variableName": "dataRows",
+                                "value": {
+                                    "value": "@variables('dataRow')",
+                                    "type": "Expression"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Create HTML Table",
+                "type": "SetVariable",
+                "dependsOn": [
+                    {
+                        "activity": "Update Html Data Rows",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "htmlTable",
+                    "value": {
+                        "value": "@concat(variables('htmlHeader'), variables('dataRows'), variables('htmlFooter'))",
+                        "type": "Expression"
+                    }
+                }
+            }
+        ],
+        "parameters": {
+            "teamsWebhookUrl": {
+                "type": "string"
+            },
+            "triggerFolderPath": {
+                "type": "string"
+            },
+            "triggerFilename": {
+                "type": "string"
+            },
+            "dataFactorySubscription": {
+                "type": "string"
+            },
+            "dataFactoryResourceGroup": {
+                "type": "string"
+            }
+        },
+        "variables": {
+            "messageCardString": {
+                "type": "String"
+            },
+            "dataRow": {
+                "type": "String"
+            },
+            "htmlHeader": {
+                "type": "String",
+                "defaultValue": "<table border color='black' border= '2'><thead><tr style = 'background-color : Teal; color: White'><th>Name</th><th>Gender</th><th>Age</th>"
+            },
+            "htmlFooter": {
+                "type": "String",
+                "defaultValue": "</tbody></table>"
+            },
+            "htmlTable": {
+                "type": "String"
+            },
+            "dataRows": {
+                "type": "String"
+            }
+        },
+        "annotations": [],
+        "lastPublishTime": "2024-01-16T11:44:12Z"
+    }
+}
